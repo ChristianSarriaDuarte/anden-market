@@ -30,19 +30,6 @@ A diferencia de los marketplaces tradicionales basados en limites comunales o co
 ## 2. Arquitectura del Sistema
 
 El proyecto sigue una arquitectura desacoplada Cliente-Servidor orientada a Single Page Application (SPA):
-El problema visual está ocurriendo por dos detalles de formato Markdown:
-
-En la sección 2 (Arquitectura): El diagrama ASCII no tiene los tres acentos graves (```) de apertura y cierre, por lo que Markdown lo interpreta como texto normal, colapsa los espacios y rompe las cajas.
-
-En la sección 6 (Estructura): Se escribió la palabra bash suelta arriba y se cerró con comillas simples (''') al final en vez de tres acentos graves de código (```).
-
-Aquí tienes únicamente los bloques de la sección 2 y la sección 6 formateados correctamente para reemplazar y que se rendericen alineados:
-
-Reemplazo para la Sección 2 (Arquitectura del Sistema)
-Markdown
-## 2. Arquitectura del Sistema
-
-El proyecto sigue una arquitectura desacoplada Cliente-Servidor orientada a Single Page Application (SPA):
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
