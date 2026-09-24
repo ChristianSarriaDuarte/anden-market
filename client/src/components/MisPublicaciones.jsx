@@ -11,9 +11,8 @@ const MAX_CARACTERES_DESC = 160;
 
 export default function MisPublicaciones({ publicaciones, onCrearPublicacion, onEditarPublicacion, onEliminarPublicacion }) {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [idEditando, setIdEditando] = useState(null); // Si es null => creando, si tiene ID => editando
+  const [idEditando, setIdEditando] = useState(null);
   
-  // Estados del formulario
   const [titulo, setTitulo] = useState('');
   const [precio, setPrecio] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -24,7 +23,8 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
   const [estacionesAñadidas, setEstacionesAñadidas] = useState([]);
   const [mensajeExito, setMensajeExito] = useState('');
 
-  const estacionesDeLaLinea = TODAS_LAS_ESTACIONES.filter(e => e.linea === lineaSeleccionada);
+  // Estaciones que pasan por la línea seleccionada en el selector
+  const estacionesDeLaLinea = TODAS_LAS_ESTACIONES.filter(e => e.lineas.includes(lineaSeleccionada));
 
   const getColorLinea = (codLinea) => {
     const l = LINEAS_METRO.find(item => item.id === codLinea);
@@ -34,14 +34,17 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
   const handleAñadirEstacion = () => {
     if (!estacionTemp) return;
     if (estacionesAñadidas.length >= 3) {
-      alert("Máximo 3 estaciones permitidas.");
+      alert("Máximo 3 estaciones permitidas por publicación.");
       return;
     }
-    const estacionObj = TODAS_LAS_ESTACIONES.find(e => e.id === parseInt(estacionTemp, 10));
+    const estacionObj = TODAS_LAS_ESTACIONES.find(e => e.id === Number(estacionTemp));
+    if (!estacionObj) return;
+
     if (estacionesAñadidas.some(e => e.id === estacionObj.id)) {
-      alert("Ya añadiste esta estación.");
+      alert(`La estación "${estacionObj.nombre}" ya está agregada.`);
       return;
     }
+
     setEstacionesAñadidas([...estacionesAñadidas, estacionObj]);
     setEstacionTemp('');
   };
@@ -50,7 +53,6 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     setEstacionesAñadidas(estacionesAñadidas.filter(e => e.id !== id));
   };
 
-  // Cargar datos en el formulario para editar
   const iniciarEdicion = (pub) => {
     setIdEditando(pub.id);
     setTitulo(pub.titulo);
@@ -59,11 +61,11 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     setTelefono(pub.telefono);
     setImagen(pub.imagen || '');
     
-    // Cargar las estaciones que tenía
-    const estacionesPrevias = (pub.estaciones || [pub.id_estacion])
-      .map(id => TODAS_LAS_ESTACIONES.find(e => e.id === id))
+    const ids = Array.isArray(pub.estaciones) ? pub.estaciones : [pub.id_estacion];
+    const previas = ids
+      .map(id => TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(id)))
       .filter(Boolean);
-    setEstacionesAñadidas(estacionesPrevias);
+    setEstacionesAñadidas(previas);
     
     setMostrarFormulario(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -86,10 +88,9 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
       return;
     }
 
-    const idsEstaciones = estacionesAñadidas.map(e => e.id);
+    const idsEstaciones = estacionesAñadidas.map(e => Number(e.id));
 
     if (idEditando) {
-      // Modificar existente
       const publicacionActualizada = {
         id: idEditando,
         titulo,
@@ -104,7 +105,6 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
       onEditarPublicacion(publicacionActualizada);
       setMensajeExito('✓ Publicación actualizada con éxito.');
     } else {
-      // Crear nueva
       const nueva = {
         id: Date.now(),
         titulo,
@@ -144,11 +144,8 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
 
         <button
           onClick={() => {
-            if (mostrarFormulario) {
-              resetFormulario();
-            } else {
-              setMostrarFormulario(true);
-            }
+            if (mostrarFormulario) resetFormulario();
+            else setMostrarFormulario(true);
           }}
           style={{
             background: mostrarFormulario ? '#4B5563' : '#E31B23',
@@ -174,7 +171,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
         </div>
       )}
 
-      {/* FORMULARIO DESPLEGABLE */}
+      {/* FORMULARIO */}
       {mostrarFormulario && (
         <div style={{ background: '#FFFFFF', padding: '24px', borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '32px' }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', color: '#1F2937' }}>
@@ -188,7 +185,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Carcasa iPhone 13 Antigolpes"
+                  placeholder="Ej: Teclado Mecánico RGB 60%"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.9rem', boxSizing: 'border-box' }}
@@ -200,7 +197,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                   type="number"
                   required
                   min="100"
-                  placeholder="Ej: 6000"
+                  placeholder="Ej: 25000"
                   value={precio}
                   onChange={(e) => setPrecio(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.9rem', boxSizing: 'border-box' }}
@@ -231,7 +228,6 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
               </div>
             </div>
 
-            {/* DESCRIPCIÓN FIJA SIN DEFORMACIÓN */}
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#374151' }}>Descripción</label>
@@ -242,7 +238,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
               <textarea
                 required
                 maxLength={MAX_CARACTERES_DESC}
-                placeholder="Detalles y condiciones de entrega en torniquetes..."
+                placeholder="Detalles y condiciones de entrega..."
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
                 style={{
@@ -253,15 +249,15 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                   border: '1px solid #D1D5DB',
                   fontSize: '0.9rem',
                   boxSizing: 'border-box',
-                  resize: 'none' // Evita que se estire con el ratón
+                  resize: 'none'
                 }}
               />
             </div>
 
-            {/* Selector de estaciones */}
+            {/* Selector de estaciones con soporte multilínea */}
             <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '14px', marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>
-                Puntos de Entrega (Hasta 3 estaciones)
+                Puntos de Entrega (Añade hasta 3 estaciones físicas)
               </label>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                 <select
@@ -278,7 +274,14 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                   style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.85rem' }}
                 >
                   <option value="">-- Elige estación --</option>
-                  {estacionesDeLaLinea.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                  {estacionesDeLaLinea.map(e => {
+                    const yaAgregada = estacionesAñadidas.some(item => item.id === e.id);
+                    return (
+                      <option key={e.id} value={e.id} disabled={yaAgregada}>
+                        {e.nombre} {e.lineas.length > 1 ? `[Comb. ${e.lineas.join('/')}]` : ''} {yaAgregada ? '(Añadida)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <button
@@ -291,11 +294,17 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                 </button>
               </div>
 
+              {/* Chips de estaciones seleccionadas */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {estacionesAñadidas.map(est => (
-                  <span key={est.id} style={{ background: '#FFFFFF', border: '1px solid #D1D5DB', padding: '3px 10px', borderRadius: '16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getColorLinea(est.linea) }} />
-                    {est.nombre}
+                  <span key={est.id} style={{ background: '#FFFFFF', border: '1px solid #D1D5DB', padding: '4px 10px', borderRadius: '16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      {est.lineas.map(lin => (
+                        <span key={lin} style={{ width: '8px', height: '8px', borderRadius: '50%', background: getColorLinea(lin) }} />
+                      ))}
+                    </div>
+                    <strong>{est.nombre}</strong>
+                    <span style={{ color: '#6B7280', fontSize: '0.75rem' }}>({est.lineas.join('/')})</span>
                     <button type="button" onClick={() => handleRemoverEstacion(est.id)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#9CA3AF' }}>✕</button>
                   </span>
                 ))}
@@ -327,8 +336,9 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
             {misAvisos.map(pub => {
               const estiloTiempo = getEstiloTiempo(pub.horasRestantes || 72);
               
-              const estacionesNombres = (pub.estaciones || [pub.id_estacion])
-                .map(id => TODAS_LAS_ESTACIONES.find(e => e.id === id))
+              const ids = Array.isArray(pub.estaciones) ? pub.estaciones : [pub.id_estacion];
+              const estacionesNombres = ids
+                .map(id => TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(id)))
                 .filter(Boolean);
 
               return (
@@ -345,7 +355,6 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                   }}
                 >
-                  {/* Foto + Datos */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <img
                       src={pub.imagen}
@@ -357,14 +366,18 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                         {pub.titulo}
                       </h4>
                       <div style={{ color: '#059669', fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '6px' }}>
-                        ${pub.precio.toLocaleString('es-CL')}
+                        ${Number(pub.precio).toLocaleString('es-CL')}
                       </div>
 
-                      {/* Chips estaciones */}
+                      {/* Chips estaciones con multilínea */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                         {estacionesNombres.map(est => (
                           <span key={est.id} style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: getColorLinea(est.linea) }} />
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                              {est.lineas.map(lin => (
+                                <span key={lin} style={{ width: '6px', height: '6px', borderRadius: '50%', background: getColorLinea(lin) }} />
+                              ))}
+                            </div>
                             {est.nombre}
                           </span>
                         ))}
@@ -372,7 +385,6 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                     </div>
                   </div>
 
-                  {/* Acciones: Tiempo + Editar + Eliminar */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{
                       fontSize: '0.75rem',
@@ -388,32 +400,14 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
 
                     <button
                       onClick={() => iniciarEdicion(pub)}
-                      style={{
-                        background: '#F3F4F6',
-                        color: '#374151',
-                        border: '1px solid #D1D5DB',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
+                      style={{ background: '#F3F4F6', color: '#374151', border: '1px solid #D1D5DB', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
                     >
                       Editar
                     </button>
 
                     <button
                       onClick={() => onEliminarPublicacion(pub.id)}
-                      style={{
-                        background: '#FEE2E2',
-                        color: '#991B1B',
-                        border: 'none',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
+                      style={{ background: '#FEE2E2', color: '#991B1B', border: 'none', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
                     >
                       Dar de baja
                     </button>

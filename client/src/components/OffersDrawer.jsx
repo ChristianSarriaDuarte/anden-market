@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import OfferCard from './OfferCard';
+import { LINEAS_METRO } from '../data/metroConfig';
 
 export default function OffersDrawer({ estacion, publicaciones, ofertaDetalle, onVerDetalle }) {
   const [filtroTipo, setFiltroTipo] = useState('Todos');
@@ -27,13 +28,23 @@ export default function OffersDrawer({ estacion, publicaciones, ofertaDetalle, o
   }
 
   // Filtrado multilínea / multiestación
-  const ofertasEstacion = publicaciones.filter(p => 
-    p.id_estacion === estacion.id || (p.estaciones && p.estaciones.includes(estacion.id))
-  );
+  const ofertasEstacion = publicaciones.filter(p => {
+    const ids = Array.isArray(p.estaciones) && p.estaciones.length > 0
+      ? p.estaciones.map(Number)
+      : [Number(p.id_estacion)];
+    return ids.includes(Number(estacion.id));
+  });
 
   const ofertasFiltradas = filtroTipo === 'Todos'
     ? ofertasEstacion
     : ofertasEstacion.filter(p => p.tipo === filtroTipo);
+
+  const getColorLinea = (cod) => {
+    const l = LINEAS_METRO.find(item => item.id === cod);
+    return l ? l.color : '#E31B23';
+  };
+
+  const lineasEstacion = Array.isArray(estacion.lineas) ? estacion.lineas : ['L1'];
 
   return (
     <div style={{
@@ -43,12 +54,26 @@ export default function OffersDrawer({ estacion, publicaciones, ofertaDetalle, o
       padding: '20px',
       overflowY: 'auto'
     }}>
-      {/* Cabecera */}
+      {/* Cabecera con badges de combinación */}
       <div style={{ background: '#FEE2E2', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px' }}>
-        <span style={{ color: '#991B1B', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-          LÍNEA 1
-        </span>
-        <h3 style={{ margin: '4px 0 0 0', color: '#1F2937', fontSize: '1.25rem' }}>
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+          {lineasEstacion.map(cod => (
+            <span
+              key={cod}
+              style={{
+                background: getColorLinea(cod),
+                color: '#FFFFFF',
+                fontWeight: 'bold',
+                fontSize: '0.7rem',
+                padding: '2px 6px',
+                borderRadius: '4px'
+              }}
+            >
+              {cod}
+            </span>
+          ))}
+        </div>
+        <h3 style={{ margin: 0, color: '#1F2937', fontSize: '1.25rem' }}>
           {estacion.nombre}
         </h3>
       </div>
@@ -75,7 +100,7 @@ export default function OffersDrawer({ estacion, publicaciones, ofertaDetalle, o
         ))}
       </div>
 
-      {/* Lista compacta */}
+      {/* Lista */}
       {ofertasFiltradas.length > 0 ? (
         ofertasFiltradas.map(pub => (
           <OfferCard 

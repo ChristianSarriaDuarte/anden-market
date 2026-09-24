@@ -6,6 +6,7 @@ import OffersDrawer from './components/OffersDrawer';
 import OfferDetailCard from './components/OfferDetailCard';
 import MisPublicaciones from './components/MisPublicaciones';
 import { SAMPLE_OFFERS } from './data/sampleOffers';
+import VistaLineas from './components/VistaLineas';
 
 // Vista 1: Mapa interactivo + Drawer + Tarjeta Detalle
 function VistaMapa({ publicaciones }) {
@@ -38,15 +39,6 @@ function VistaMapa({ publicaciones }) {
   );
 }
 
-// Vista 2: Por Línea (placeholder)
-function VistaLineas({ publicaciones }) {
-  return (
-    <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      <h2>Explorador por Línea</h2>
-      <p style={{ color: '#6B7280' }}>Selecciona una línea para revisar todas sus publicaciones activas.</p>
-    </div>
-  );
-}
 
 // Vista 4: Perfil (placeholder)
 function VistaPerfil() {
