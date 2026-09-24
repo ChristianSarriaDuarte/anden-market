@@ -26,7 +26,11 @@ export default function OffersDrawer({ estacion, publicaciones, ofertaDetalle, o
     );
   }
 
-  const ofertasEstacion = publicaciones.filter(p => p.id_estacion === estacion.id);
+  // Filtrado multilínea / multiestación
+  const ofertasEstacion = publicaciones.filter(p => 
+    p.id_estacion === estacion.id || (p.estaciones && p.estaciones.includes(estacion.id))
+  );
+
   const ofertasFiltradas = filtroTipo === 'Todos'
     ? ofertasEstacion
     : ofertasEstacion.filter(p => p.tipo === filtroTipo);
