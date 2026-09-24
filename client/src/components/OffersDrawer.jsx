@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import OfferCard from './OfferCard';
 
-export default function OffersDrawer({ estacion, publicaciones }) {
+export default function OffersDrawer({ estacion, publicaciones, ofertaDetalle, onVerDetalle }) {
   const [filtroTipo, setFiltroTipo] = useState('Todos');
 
   if (!estacion) {
@@ -71,10 +71,15 @@ export default function OffersDrawer({ estacion, publicaciones }) {
         ))}
       </div>
 
-      {/* Lista */}
+      {/* Lista compacta */}
       {ofertasFiltradas.length > 0 ? (
         ofertasFiltradas.map(pub => (
-          <OfferCard key={pub.id} oferta={pub} />
+          <OfferCard 
+            key={pub.id} 
+            oferta={pub} 
+            onVerDetalle={onVerDetalle}
+            estaSeleccionada={ofertaDetalle?.id === pub.id}
+          />
         ))
       ) : (
         <p style={{ color: '#9CA3AF', fontSize: '0.85rem', fontStyle: 'italic', textAlign: 'center', marginTop: '30px' }}>

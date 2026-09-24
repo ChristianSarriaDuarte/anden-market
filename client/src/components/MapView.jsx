@@ -5,8 +5,15 @@ import { SANTIAGO_BOUNDS, ESTACIONES_L1 } from '../data/metroConfig';
 export default function MapView({ onSelectEstacion }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  
+  // Guardamos el callback en un ref para que nunca fuerce la reinicialización del mapa
+  const onSelectRef = useRef(onSelectEstacion);
+  useEffect(() => {
+    onSelectRef.current = onSelectEstacion;
+  }, [onSelectEstacion]);
 
   useEffect(() => {
+    // Si ya existe la instancia o no está el contenedor, no hacer nada
     if (mapInstanceRef.current || !mapContainerRef.current) return;
 
     const santiagoBounds = L.latLngBounds(SANTIAGO_BOUNDS[0], SANTIAGO_BOUNDS[1]);
@@ -20,6 +27,7 @@ export default function MapView({ onSelectEstacion }) {
 
     mapInstanceRef.current = map;
 
+    // Capa base
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
@@ -33,7 +41,7 @@ export default function MapView({ onSelectEstacion }) {
       opacity: 0.85,
     }).addTo(map);
 
-    // Nodos interactivos
+    // Nodos de estaciones
     ESTACIONES_L1.forEach(estacion => {
       const marker = L.circleMarker(estacion.coords, {
         radius: 8,
@@ -48,8 +56,11 @@ export default function MapView({ onSelectEstacion }) {
         offset: [0, -6],
       });
 
+      // Dispara la función usando el ref estable
       marker.on('click', () => {
-        onSelectEstacion(estacion);
+        if (onSelectRef.current) {
+          onSelectRef.current(estacion);
+        }
       });
     });
 
@@ -57,7 +68,7 @@ export default function MapView({ onSelectEstacion }) {
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [onSelectEstacion]);
+  }, []); // Array vacío: se monta una sola vez y no parpadea nunca más
 
   return (
     <div 

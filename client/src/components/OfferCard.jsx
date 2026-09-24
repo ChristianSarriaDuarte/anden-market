@@ -1,59 +1,72 @@
 import React from 'react';
 
-export default function OfferCard({ oferta }) {
-  const { titulo, precio, tipo, descripcion, telefono } = oferta;
+function getEstiloTiempo(horas) {
+  if (horas > 48) return { bg: '#DCFCE7', color: '#166534' };
+  if (horas >= 24) return { bg: '#FEF9C3', color: '#854D0E' };
+  return { bg: '#FEE2E2', color: '#991B1B' };
+}
 
-  const esServicio = tipo === 'Servicio';
+export default function OfferCard({ oferta, onVerDetalle, estaSeleccionada }) {
+  const { titulo, precio, tipo, horasRestantes = 72 } = oferta;
+  const estiloTiempo = getEstiloTiempo(horasRestantes);
 
   return (
     <div style={{
-      border: '1px solid #E5E7EB',
+      border: estaSeleccionada ? '2px solid #E31B23' : '1px solid #E5E7EB',
       borderRadius: '8px',
-      padding: '14px',
-      marginBottom: '12px',
-      background: '#FAFAFA'
+      padding: '12px',
+      marginBottom: '10px',
+      background: estaSeleccionada ? '#FEF2F2' : '#FFFFFF',
+      transition: 'all 0.15s ease'
     }}>
-      <span style={{
-        fontSize: '0.7rem',
-        background: esServicio ? '#E0E7FF' : '#DCFCE7',
-        color: esServicio ? '#3730A3' : '#166534',
-        padding: '3px 8px',
-        borderRadius: '4px',
-        fontWeight: 'bold',
-        textTransform: 'uppercase'
-      }}>
-        {tipo}
-      </span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+        <span style={{
+          fontSize: '0.7rem',
+          background: '#F3F4F6',
+          color: '#374151',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase'
+        }}>
+          {tipo}
+        </span>
+        <span style={{
+          fontSize: '0.7rem',
+          background: estiloTiempo.bg,
+          color: estiloTiempo.color,
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontWeight: 'bold'
+        }}>
+          ⏳ {horasRestantes}h restantes
+        </span>
+      </div>
 
-      <h4 style={{ margin: '8px 0 4px 0', fontSize: '1rem', color: '#111827' }}>
+      <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', color: '#111827' }}>
         {titulo}
       </h4>
 
-      <p style={{ margin: '0 0 8px 0', color: '#059669', fontWeight: 'bold', fontSize: '1.1rem' }}>
+      <p style={{ margin: '0 0 10px 0', color: '#059669', fontWeight: 'bold', fontSize: '1.05rem' }}>
         ${precio.toLocaleString('es-CL')}
       </p>
 
-      <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: '#4B5563', lineHeight: '1.4' }}>
-        {descripcion}
-      </p>
-
-      <a
-        href={`https://wa.me/${telefono}?text=Hola,%20te%20escribo%20desde%20Anden%20Market%20por:%20${encodeURIComponent(titulo)}`}
-        target="_blank"
-        rel="noreferrer"
+      <button
+        onClick={() => onVerDetalle(oferta)}
         style={{
-          display: 'inline-block',
-          background: '#25D366',
+          width: '100%',
+          padding: '7px 0',
+          background: '#1F2937',
           color: '#FFFFFF',
-          padding: '8px 14px',
+          border: 'none',
           borderRadius: '6px',
-          textDecoration: 'none',
           fontSize: '0.8rem',
-          fontWeight: 'bold'
+          fontWeight: '600',
+          cursor: 'pointer'
         }}
       >
-        Contactar por WhatsApp
-      </a>
+        Ver detalle
+      </button>
     </div>
   );
 }
