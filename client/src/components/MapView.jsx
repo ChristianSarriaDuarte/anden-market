@@ -1,62 +1,138 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { SANTIAGO_BOUNDS, ESTACIONES_L1 } from '../data/metroConfig';
+import 'leaflet/dist/leaflet.css';
+import { 
+  TODAS_LAS_ESTACIONES, 
+  TRAZADO_L1, 
+  TRAZADO_L2, 
+  TRAZADO_L3,
+  TRAZADO_L4, 
+  TRAZADO_L4A, 
+  TRAZADO_L5, 
+  TRAZADO_L6,
+  SANTIAGO_BOUNDS, 
+  LINEAS_METRO 
+} from '../data/metroConfig';
 
 export default function MapView({ onSelectEstacion }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  
-  // Guardamos el callback en un ref para que nunca fuerce la reinicialización del mapa
+
   const onSelectRef = useRef(onSelectEstacion);
   useEffect(() => {
     onSelectRef.current = onSelectEstacion;
   }, [onSelectEstacion]);
 
   useEffect(() => {
-    // Si ya existe la instancia o no está el contenedor, no hacer nada
-    if (mapInstanceRef.current || !mapContainerRef.current) return;
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;
 
-    const santiagoBounds = L.latLngBounds(SANTIAGO_BOUNDS[0], SANTIAGO_BOUNDS[1]);
-
+    // 1. Inicializar Mapa
     const map = L.map(mapContainerRef.current, {
-      minZoom: 11,
-      maxZoom: 17,
-      maxBounds: santiagoBounds,
-      maxBoundsViscosity: 1.0,
-    }).setView([-33.4372, -70.6346], 13);
+      center: [-33.4500, -70.6400],
+      zoom: 12,
+      maxBounds: SANTIAGO_BOUNDS,
+      minZoom: 12,
+      maxZoom: 16
+    });
 
     mapInstanceRef.current = map;
 
-    // Capa base
+    // 2. Capa base OpenStreetMap suavizada
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      className: 'mapa-base-suave'
     }).addTo(map);
 
-    // Trazado de Línea 1
-    const puntosRuta = ESTACIONES_L1.map(est => est.coords);
-    L.polyline(puntosRuta, {
+    // 3. Trazado Línea 1 (Rojo)
+    L.polyline(TRAZADO_L1, {
       color: '#E31B23',
-      weight: 6,
-      opacity: 0.85,
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
     }).addTo(map);
 
-    // Nodos de estaciones
-    ESTACIONES_L1.forEach(estacion => {
+    // 4. Trazado Línea 2 (Amarillo Metro)
+    L.polyline(TRAZADO_L2, {
+      color: '#F5A623',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // 5. Trazado Línea 3 (Café Metro)
+    L.polyline(TRAZADO_L3, {
+      color: '#7D5836',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // 6. Trazado Línea 4 (Azul Metro)
+    L.polyline(TRAZADO_L4, {
+      color: '#0055A5',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // 7. Trazado Línea 4A (Celeste Metro)
+    L.polyline(TRAZADO_L4A, {
+      color: '#00AEEF',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // 8. Trazado Línea 5 (Verde Metro)
+    L.polyline(TRAZADO_L5, {
+      color: '#009640',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // 9. Trazado Línea 6 (Morado Metro)
+    L.polyline(TRAZADO_L6, {
+      color: '#6A2A82',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    const getColorLinea = (cod) => {
+      const l = LINEAS_METRO.find(item => item.id === cod);
+      return l ? l.color : '#E31B23';
+    };
+
+    // 10. Marcadores de estaciones
+    const estacionesConCoords = TODAS_LAS_ESTACIONES.filter(e => e.coords);
+
+    estacionesConCoords.forEach(estacion => {
+      const esCombinacion = estacion.lineas.length > 1;
+      const colorPrimario = getColorLinea(estacion.lineas[0]);
+
       const marker = L.circleMarker(estacion.coords, {
-        radius: 8,
-        color: '#FFFFFF',
-        fillColor: '#E31B23',
+        radius: esCombinacion ? 7 : 5,
+        color: esCombinacion ? '#111827' : colorPrimario,
+        fillColor: '#FFFFFF',
         fillOpacity: 1,
-        weight: 2,
+        weight: esCombinacion ? 3 : 2.5
       }).addTo(map);
 
-      marker.bindTooltip(estacion.nombre, {
-        direction: 'top',
-        offset: [0, -6],
-      });
+      const textoCombinacion = esCombinacion ? ` (${estacion.lineas.join('/')})` : '';
+      marker.bindTooltip(
+        `<div style="font-family:sans-serif;font-weight:bold;font-size:12px;">${estacion.nombre}${textoCombinacion}</div>`,
+        { direction: 'top', offset: [0, -6], opacity: 0.95 }
+      );
 
-      // Dispara la función usando el ref estable
       marker.on('click', () => {
         if (onSelectRef.current) {
           onSelectRef.current(estacion);
@@ -68,12 +144,19 @@ export default function MapView({ onSelectEstacion }) {
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, []); // Array vacío: se monta una sola vez y no parpadea nunca más
+  }, []);
 
   return (
-    <div 
-      ref={mapContainerRef} 
-      style={{ flex: 1, height: '100%', width: '100%' }} 
-    />
+    <>
+      <style>{`
+        .mapa-base-suave {
+          filter: saturate(0.75) contrast(0.92) brightness(1.02);
+        }
+      `}</style>
+      <div 
+        ref={mapContainerRef} 
+        style={{ width: '100%', height: '100%', background: '#F8FAFC' }} 
+      />
+    </>
   );
 }

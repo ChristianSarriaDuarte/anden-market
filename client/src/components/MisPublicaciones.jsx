@@ -31,6 +31,42 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     return l ? l.color : '#374151';
   };
 
+  // Abrir formulario nuevo precargando perfil si existe
+  const handleAbrirNuevoFormulario = () => {
+    setIdEditando(null);
+    setTitulo('');
+    setPrecio('');
+    setDescripcion('');
+    setImagen('');
+
+    const perfilRaw = localStorage.getItem('anden_perfil');
+    if (perfilRaw) {
+      try {
+        const perfil = JSON.parse(perfilRaw);
+        setTelefono(perfil.telefono || '56912345678');
+        
+        if (perfil.estacionHabitual) {
+          const estHabitualObj = TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(perfil.estacionHabitual));
+          if (estHabitualObj) {
+            setEstacionesAñadidas([estHabitualObj]);
+          } else {
+            setEstacionesAñadidas([]);
+          }
+        } else {
+          setEstacionesAñadidas([]);
+        }
+      } catch (err) {
+        setTelefono('56912345678');
+        setEstacionesAñadidas([]);
+      }
+    } else {
+      setTelefono('56912345678');
+      setEstacionesAñadidas([]);
+    }
+
+    setMostrarFormulario(true);
+  };
+
   const handleAñadirEstacion = () => {
     if (!estacionTemp) return;
     if (estacionesAñadidas.length >= 3) {
@@ -90,6 +126,16 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
 
     const idsEstaciones = estacionesAñadidas.map(e => Number(e.id));
 
+    // Obtener alias del perfil actual si existe
+    let vendedorAlias = 'Vendedor';
+    const perfilRaw = localStorage.getItem('anden_perfil');
+    if (perfilRaw) {
+      try {
+        const perfil = JSON.parse(perfilRaw);
+        if (perfil.alias) vendedorAlias = perfil.alias;
+      } catch (err) {}
+    }
+
     if (idEditando) {
       const publicacionActualizada = {
         id: idEditando,
@@ -107,6 +153,8 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     } else {
       const nueva = {
         id: Date.now(),
+        creadoEn: Date.now(), // Timestamp base para caducidad real
+        vendedor: vendedorAlias,
         titulo,
         precio: parseInt(precio, 10),
         tipo: 'Producto',
@@ -145,7 +193,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
         <button
           onClick={() => {
             if (mostrarFormulario) resetFormulario();
-            else setMostrarFormulario(true);
+            else handleAbrirNuevoFormulario();
           }}
           style={{
             background: mostrarFormulario ? '#4B5563' : '#E31B23',

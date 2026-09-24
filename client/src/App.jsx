@@ -7,6 +7,7 @@ import OfferDetailCard from './components/OfferDetailCard';
 import MisPublicaciones from './components/MisPublicaciones';
 import { SAMPLE_OFFERS } from './data/sampleOffers';
 import VistaLineas from './components/VistaLineas';
+import VistaPerfil from './components/VistaPerfil';
 
 // Vista 1: Mapa interactivo + Drawer + Tarjeta Detalle
 function VistaMapa({ publicaciones }) {
@@ -35,17 +36,6 @@ function VistaMapa({ publicaciones }) {
         ofertaDetalle={ofertaDetalle}
         onVerDetalle={setOfertaDetalle}
       />
-    </div>
-  );
-}
-
-
-// Vista 4: Perfil (placeholder)
-function VistaPerfil() {
-  return (
-    <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      <h2>Mi Perfil</h2>
-      <p style={{ color: '#6B7280' }}>Configuración de cuenta y número de contacto de WhatsApp.</p>
     </div>
   );
 }
