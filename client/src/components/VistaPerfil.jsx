@@ -1,51 +1,58 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../supabaseClient';
 import { TODAS_LAS_ESTACIONES, LINEAS_METRO } from '../data/metroConfig';
 
 export default function VistaPerfil() {
-  const [perfil, setPerfil] = useState(null);
+  const { user } = useAuth();
   const [modoEdicion, setModoEdicion] = useState(false);
 
   // Estados del formulario
   const [alias, setAlias] = useState('');
-  const [telefonoRaw, setTelefonoRaw] = useState(''); // Solo 9 dígitos (ej: 971960848)
+  const [telefonoRaw, setTelefonoRaw] = useState(''); // Solo 9 dígitos
   const [lineaFiltro, setLineaFiltro] = useState('L1');
   const [estacionHabitual, setEstacionHabitual] = useState('');
   const [mensajeExito, setMensajeExito] = useState('');
+  const [guardando, setGuardando] = useState(false);
 
+  // Cargar datos del usuario autenticado en Supabase
   useEffect(() => {
-    const perfilGuardado = localStorage.getItem('anden_perfil');
-    if (perfilGuardado) {
-      try {
-        const data = JSON.parse(perfilGuardado);
-        setPerfil(data);
-        setAlias(data.alias || '');
-        
-        // Limpiar para extraer solo los 9 dígitos sin '56'
-        let numLimpio = (data.telefono || '').replace(/\D/g, '');
-        if (numLimpio.startsWith('56')) {
-          numLimpio = numLimpio.slice(2);
-        }
-        setTelefonoRaw(numLimpio);
-        setEstacionHabitual(data.estacionHabitual ? String(data.estacionHabitual) : '');
+    if (user) {
+      const meta = user.user_metadata || {};
+      const nombreUsuario = meta.nombre || meta.alias || '';
+      setAlias(nombreUsuario);
 
-        if (data.estacionHabitual) {
-          const estObj = TODAS_LAS_ESTACIONES.find(e => e.id === Number(data.estacionHabitual));
-          if (estObj && estObj.lineas.length > 0) {
-            setLineaFiltro(estObj.lineas[0]);
-          }
+      let numLimpio = (meta.telefono || '').replace(/\D/g, '');
+      if (numLimpio.startsWith('56')) {
+        numLimpio = numLimpio.slice(2);
+      }
+      setTelefonoRaw(numLimpio);
+
+      if (meta.estacionHabitual) {
+        setEstacionHabitual(String(meta.estacionHabitual));
+        const estObj = TODAS_LAS_ESTACIONES.find(e => e.id === Number(meta.estacionHabitual));
+        if (estObj && estObj.lineas.length > 0) {
+          setLineaFiltro(estObj.lineas[0]);
         }
-      } catch (err) {}
-    } else {
-      setModoEdicion(true);
+      } else {
+        setEstacionHabitual('');
+      }
+
+      // Si el usuario no tiene datos guardados todavía, abrir edición
+      if (!nombreUsuario) {
+        setModoEdicion(true);
+      } else {
+        setModoEdicion(false);
+      }
     }
-  }, []);
+  }, [user]);
 
   const getColorLinea = (cod) => {
     const l = LINEAS_METRO.find(item => item.id === cod);
     return l ? l.color : '#E31B23';
   };
 
-  const handleGuardar = (e) => {
+  const handleGuardar = async (e) => {
     e.preventDefault();
 
     const digitos = telefonoRaw.replace(/\D/g, '');
@@ -54,20 +61,33 @@ export default function VistaPerfil() {
       return;
     }
 
-    const dataPerfil = {
-      alias: alias.trim() || 'Vendedor Anónimo',
-      telefono: `56${digitos}`, // Guardado listo para WhatsApp
-      telefonoDisplay: digitos,
-      estacionHabitual: estacionHabitual ? Number(estacionHabitual) : null
-    };
+    setGuardando(true);
 
-    localStorage.setItem('anden_perfil', JSON.stringify(dataPerfil));
-    setPerfil(dataPerfil);
-    setModoEdicion(false);
-    setMensajeExito('✓ Perfil guardado correctamente.');
-    setTimeout(() => setMensajeExito(''), 3500);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          nombre: alias.trim() || 'Vendedor Anónimo',
+          alias: alias.trim() || 'Vendedor Anónimo',
+          telefono: `56${digitos}`,
+          telefonoDisplay: digitos,
+          estacionHabitual: estacionHabitual ? Number(estacionHabitual) : null
+        }
+      });
+
+      if (error) throw error;
+
+      setModoEdicion(false);
+      setMensajeExito('✓ Perfil guardado correctamente.');
+      setTimeout(() => setMensajeExito(''), 3500);
+    } catch (err) {
+      alert("Error al guardar perfil: " + err.message);
+    } finally {
+      setGuardando(false);
+    }
   };
 
+  const perfil = user?.user_metadata;
+  const tieneDatos = perfil?.nombre || perfil?.alias;
   const estacionesDeLaLinea = TODAS_LAS_ESTACIONES.filter(e => e.lineas.includes(lineaFiltro));
   const estacionHabitualObj = perfil?.estacionHabitual 
     ? TODAS_LAS_ESTACIONES.find(e => e.id === Number(perfil.estacionHabitual)) 
@@ -83,11 +103,11 @@ export default function VistaPerfil() {
             Mi Perfil de Vendedor
           </h2>
           <p style={{ color: '#6B7280', fontSize: '0.9rem', margin: 0 }}>
-            Identidad de intercambio y datos de entrega predeterminados.
+            Sesión iniciada como: <strong style={{ color: '#111827' }}>{user?.email}</strong>
           </p>
         </div>
 
-        {perfil && (
+        {tieneDatos && (
           <button
             onClick={() => setModoEdicion(!modoEdicion)}
             style={{
@@ -122,7 +142,7 @@ export default function VistaPerfil() {
       )}
 
       {/* ESTADO 1: FICHA VISUAL DEL PERFIL */}
-      {!modoEdicion && perfil && (
+      {!modoEdicion && tieneDatos && (
         <div style={{
           background: '#FFFFFF',
           border: '1px solid #E5E7EB',
@@ -143,11 +163,11 @@ export default function VistaPerfil() {
               fontSize: '1.8rem',
               fontWeight: 'bold'
             }}>
-              {perfil.alias ? perfil.alias.charAt(0).toUpperCase() : 'V'}
+              {(alias || user?.email || 'V').charAt(0).toUpperCase()}
             </div>
             <div>
               <h3 style={{ margin: '0 0 4px 0', fontSize: '1.3rem', color: '#111827' }}>
-                {perfil.alias}
+                {alias}
               </h3>
               <span style={{ fontSize: '0.8rem', background: '#F3F4F6', color: '#4B5563', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
                 Vendedor Verificado Andén
@@ -156,11 +176,22 @@ export default function VistaPerfil() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid #F3F4F6', paddingTop: '20px' }}>
+            
+            {/* Correo Electrónico Registrado */}
             <div>
-              <span style={{ fontSize: '0.8rem', color: '#6B7280', display: 'block', marginBottom: '2px' }}>WhatsApp de contacto:</span>
-              <strong style={{ fontSize: '1rem', color: '#111827' }}>+56 {perfil.telefonoDisplay || perfil.telefono?.slice(2)}</strong>
+              <span style={{ fontSize: '0.8rem', color: '#6B7280', display: 'block', marginBottom: '2px' }}>Correo de la cuenta:</span>
+              <strong style={{ fontSize: '1rem', color: '#111827' }}>{user?.email}</strong>
             </div>
 
+            {/* WhatsApp */}
+            <div>
+              <span style={{ fontSize: '0.8rem', color: '#6B7280', display: 'block', marginBottom: '2px' }}>WhatsApp de contacto:</span>
+              <strong style={{ fontSize: '1rem', color: '#111827' }}>
+                {telefonoRaw ? `+56 ${telefonoRaw}` : 'Sin teléfono configurado'}
+              </strong>
+            </div>
+
+            {/* Estación habitual */}
             <div>
               <span style={{ fontSize: '0.8rem', color: '#6B7280', display: 'block', marginBottom: '6px' }}>Estación habitual de entrega:</span>
               {estacionHabitualObj ? (
@@ -205,17 +236,40 @@ export default function VistaPerfil() {
           padding: '28px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
         }}>
-          {!perfil && (
+          {!tieneDatos && (
             <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', color: '#1E40AF', fontSize: '0.85rem' }}>
               ℹ️ Configura tu perfil de vendedor para autocompletar tus publicaciones.
             </div>
           )}
 
           <h3 style={{ margin: '0 0 18px 0', fontSize: '1.15rem', color: '#1F2937' }}>
-            {perfil ? 'Editar Datos de Vendedor' : 'Registrar Perfil'}
+            {tieneDatos ? 'Editar Datos de Vendedor' : 'Registrar Perfil'}
           </h3>
 
           <form onSubmit={handleGuardar}>
+            {/* Campo Informativo: Correo Registrado */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#374151', marginBottom: '6px' }}>
+                Correo Registrado
+              </label>
+              <input
+                type="text"
+                disabled
+                value={user?.email || ''}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #E5E7EB',
+                  background: '#F3F4F6',
+                  color: '#6B7280',
+                  fontSize: '0.9rem',
+                  boxSizing: 'border-box',
+                  cursor: 'not-allowed'
+                }}
+              />
+            </div>
+
             {/* Alias */}
             <div style={{ marginBottom: '18px' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#374151', marginBottom: '6px' }}>
@@ -310,6 +364,7 @@ export default function VistaPerfil() {
 
             <button
               type="submit"
+              disabled={guardando}
               style={{
                 width: '100%',
                 background: '#E31B23',
@@ -319,10 +374,10 @@ export default function VistaPerfil() {
                 borderRadius: '8px',
                 fontWeight: 'bold',
                 fontSize: '0.95rem',
-                cursor: 'pointer'
+                cursor: guardando ? 'not-allowed' : 'pointer'
               }}
             >
-              Guardar y Ver Perfil
+              {guardando ? 'Guardando en Supabase...' : 'Guardar y Ver Perfil'}
             </button>
           </form>
         </div>

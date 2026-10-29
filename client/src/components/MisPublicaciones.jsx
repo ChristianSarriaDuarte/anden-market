@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../supabaseClient';
 import { TODAS_LAS_ESTACIONES, LINEAS_METRO } from '../data/metroConfig';
 
 function getEstiloTiempo(horas) {
@@ -9,21 +11,23 @@ function getEstiloTiempo(horas) {
 
 const MAX_CARACTERES_DESC = 160;
 
-export default function MisPublicaciones({ publicaciones, onCrearPublicacion, onEditarPublicacion, onEliminarPublicacion }) {
+export default function MisPublicaciones({ publicaciones, onRecargar, onEliminarPublicacion }) {
+  const { user } = useAuth();
+
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
   
   const [titulo, setTitulo] = useState('');
   const [precio, setPrecio] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [telefono, setTelefono] = useState('56912345678');
+  const [telefono, setTelefono] = useState('');
   const [imagen, setImagen] = useState('');
   const [lineaSeleccionada, setLineaSeleccionada] = useState('L1');
   const [estacionTemp, setEstacionTemp] = useState('');
   const [estacionesAñadidas, setEstacionesAñadidas] = useState([]);
   const [mensajeExito, setMensajeExito] = useState('');
+  const [cargando, setCargando] = useState(false);
 
-  // Estaciones que pasan por la línea seleccionada en el selector
   const estacionesDeLaLinea = TODAS_LAS_ESTACIONES.filter(e => e.lineas.includes(lineaSeleccionada));
 
   const getColorLinea = (codLinea) => {
@@ -31,7 +35,16 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     return l ? l.color : '#374151';
   };
 
-  // Abrir formulario nuevo precargando perfil si existe
+  const calcularHorasRestantes = (creadoEn) => {
+    if (!creadoEn) return 72;
+    const creado = new Date(creadoEn).getTime();
+    const ahora = Date.now();
+    const horasPasadas = (ahora - creado) / (1000 * 60 * 60);
+    const restantes = Math.round(72 - horasPasadas);
+    return restantes > 0 ? restantes : 0;
+  };
+
+  // Abrir formulario precargando los datos del usuario en Supabase
   const handleAbrirNuevoFormulario = () => {
     setIdEditando(null);
     setTitulo('');
@@ -39,28 +52,13 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     setDescripcion('');
     setImagen('');
 
-    const perfilRaw = localStorage.getItem('anden_perfil');
-    if (perfilRaw) {
-      try {
-        const perfil = JSON.parse(perfilRaw);
-        setTelefono(perfil.telefono || '56912345678');
-        
-        if (perfil.estacionHabitual) {
-          const estHabitualObj = TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(perfil.estacionHabitual));
-          if (estHabitualObj) {
-            setEstacionesAñadidas([estHabitualObj]);
-          } else {
-            setEstacionesAñadidas([]);
-          }
-        } else {
-          setEstacionesAñadidas([]);
-        }
-      } catch (err) {
-        setTelefono('56912345678');
-        setEstacionesAñadidas([]);
-      }
+    const meta = user?.user_metadata || {};
+    setTelefono(meta.telefono || '56912345678');
+
+    if (meta.estacionHabitual) {
+      const estHabitualObj = TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(meta.estacionHabitual));
+      setEstacionesAñadidas(estHabitualObj ? [estHabitualObj] : []);
     } else {
-      setTelefono('56912345678');
       setEstacionesAñadidas([]);
     }
 
@@ -92,12 +90,12 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
   const iniciarEdicion = (pub) => {
     setIdEditando(pub.id);
     setTitulo(pub.titulo);
-    setPrecio(pub.precio);
-    setDescripcion(pub.descripcion);
-    setTelefono(pub.telefono);
+    setPrecio(String(pub.precio));
+    setDescripcion(pub.descripcion || '');
+    setTelefono(pub.contacto_vendedor || user?.user_metadata?.telefono || '');
     setImagen(pub.imagen || '');
     
-    const ids = Array.isArray(pub.estaciones) ? pub.estaciones : [pub.id_estacion];
+    const ids = Array.isArray(pub.estaciones) ? pub.estaciones : [pub.estacionId];
     const previas = ids
       .map(id => TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(id)))
       .filter(Boolean);
@@ -115,66 +113,98 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
     setImagen('');
     setEstacionesAñadidas([]);
     setMostrarFormulario(false);
+    setCargando(false);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (estacionesAñadidas.length === 0) {
       alert("Debes añadir al menos 1 estación de entrega.");
       return;
     }
 
+    setCargando(true);
     const idsEstaciones = estacionesAñadidas.map(e => Number(e.id));
+    const urlImagenFinal = imagen.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
-    // Obtener alias del perfil actual si existe
-    let vendedorAlias = 'Vendedor';
-    const perfilRaw = localStorage.getItem('anden_perfil');
-    if (perfilRaw) {
-      try {
-        const perfil = JSON.parse(perfilRaw);
-        if (perfil.alias) vendedorAlias = perfil.alias;
-      } catch (err) {}
+    try {
+      if (idEditando) {
+        // 1. Actualizar la publicación en Supabase
+        const { error: errPub } = await supabase
+          .from('publicaciones')
+          .update({
+            titulo,
+            precio: parseInt(precio, 10),
+            descripcion,
+            imagen: urlImagenFinal
+          })
+          .eq('id', idEditando)
+          .eq('usuario_id', user.id);
+
+        if (errPub) throw errPub;
+
+        // 2. Reemplazar asociaciones en publicacion_estaciones
+        await supabase
+          .from('publicacion_estaciones')
+          .delete()
+          .eq('publicacion_id', idEditando);
+
+        const relaciones = idsEstaciones.map(estId => ({
+          publicacion_id: idEditando,
+          estacion_id: estId
+        }));
+
+        const { error: errRel } = await supabase
+          .from('publicacion_estaciones')
+          .insert(relaciones);
+
+        if (errRel) throw errRel;
+
+        setMensajeExito('✓ Publicación actualizada en Supabase.');
+      } else {
+        // 1. Insertar nueva publicación
+        const { data: pubData, error: errPub } = await supabase
+          .from('publicaciones')
+          .insert([{
+            titulo,
+            precio: parseInt(precio, 10),
+            tipo: 'Producto',
+            descripcion,
+            imagen: urlImagenFinal,
+            usuario_id: user.id
+          }])
+          .select()
+          .single();
+
+        if (errPub) throw errPub;
+
+        // 2. Insertar enlaces en publicacion_estaciones
+        const relaciones = idsEstaciones.map(estId => ({
+          publicacion_id: pubData.id,
+          estacion_id: estId
+        }));
+
+        const { error: errRel } = await supabase
+          .from('publicacion_estaciones')
+          .insert(relaciones);
+
+        if (errRel) throw errRel;
+
+        setMensajeExito('✓ ¡Publicación creada con éxito en Supabase!');
+      }
+
+      await onRecargar();
+      resetFormulario();
+      setTimeout(() => setMensajeExito(''), 4000);
+    } catch (err) {
+      alert("Error al guardar la publicación: " + err.message);
+    } finally {
+      setCargando(false);
     }
-
-    if (idEditando) {
-      const publicacionActualizada = {
-        id: idEditando,
-        titulo,
-        precio: parseInt(precio, 10),
-        tipo: 'Producto',
-        descripcion,
-        telefono: telefono.replace(/\s+/g, ''),
-        estaciones: idsEstaciones,
-        id_estacion: idsEstaciones[0],
-        imagen: imagen.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'
-      };
-      onEditarPublicacion(publicacionActualizada);
-      setMensajeExito('✓ Publicación actualizada con éxito.');
-    } else {
-      const nueva = {
-        id: Date.now(),
-        creadoEn: Date.now(), // Timestamp base para caducidad real
-        vendedor: vendedorAlias,
-        titulo,
-        precio: parseInt(precio, 10),
-        tipo: 'Producto',
-        descripcion,
-        telefono: telefono.replace(/\s+/g, ''),
-        horasRestantes: 72,
-        estaciones: idsEstaciones,
-        id_estacion: idsEstaciones[0],
-        esPropia: true,
-        imagen: imagen.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'
-      };
-      onCrearPublicacion(nueva);
-      setMensajeExito('✓ ¡Publicación creada con éxito!');
-    }
-
-    resetFormulario();
-    setTimeout(() => setMensajeExito(''), 4000);
   };
 
-  const misAvisos = publicaciones.filter(p => p.esPropia || p.id > 1000);
+  // Filtrar avisos del usuario actual conectado
+  const misAvisos = publicaciones.filter(p => p.usuario_id === user?.id);
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '30px 20px', fontFamily: 'sans-serif' }}>
@@ -186,7 +216,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
             Mis Publicaciones
           </h2>
           <p style={{ color: '#6B7280', fontSize: '0.9rem', margin: 0 }}>
-            Administra tus avisos vigentes en circulación o crea una nueva oferta.
+            Administra tus avisos en circulación asociados a tu cuenta.
           </p>
         </div>
 
@@ -233,7 +263,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Teclado Mecánico RGB 60%"
+                  placeholder="Ej: Alfajores Artesanales Pack x3"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.9rem', boxSizing: 'border-box' }}
@@ -245,7 +275,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                   type="number"
                   required
                   min="100"
-                  placeholder="Ej: 25000"
+                  placeholder="Ej: 2500"
                   value={precio}
                   onChange={(e) => setPrecio(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.9rem', boxSizing: 'border-box' }}
@@ -255,13 +285,12 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#374151', marginBottom: '6px' }}>WhatsApp</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#374151', marginBottom: '6px' }}>WhatsApp Vendedor</label>
                 <input
                   type="text"
-                  required
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                  disabled
+                  value={telefono ? `+${telefono}` : '+56 9... (Definir en Perfil)'}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #E5E7EB', background: '#F3F4F6', color: '#6B7280', fontSize: '0.9rem', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
@@ -286,7 +315,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
               <textarea
                 required
                 maxLength={MAX_CARACTERES_DESC}
-                placeholder="Detalles y condiciones de entrega..."
+                placeholder="Detalles del producto y horario de entrega en el andén..."
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
                 style={{
@@ -302,7 +331,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
               />
             </div>
 
-            {/* Selector de estaciones con soporte multilínea */}
+            {/* Puntos de entrega */}
             <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '14px', marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>
                 Puntos de Entrega (Añade hasta 3 estaciones físicas)
@@ -359,8 +388,21 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
               </div>
             </div>
 
-            <button type="submit" style={{ width: '100%', background: '#E31B23', color: '#FFFFFF', padding: '12px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-              {idEditando ? 'Guardar Cambios' : 'Confirmar y Publicar'}
+            <button 
+              type="submit" 
+              disabled={cargando}
+              style={{ 
+                width: '100%', 
+                background: '#E31B23', 
+                color: '#FFFFFF', 
+                padding: '12px', 
+                border: 'none', 
+                borderRadius: '8px', 
+                fontWeight: 'bold', 
+                cursor: cargando ? 'not-allowed' : 'pointer' 
+              }}
+            >
+              {cargando ? 'Guardando en Supabase...' : (idEditando ? 'Guardar Cambios' : 'Confirmar y Publicar')}
             </button>
           </form>
         </div>
@@ -382,9 +424,10 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {misAvisos.map(pub => {
-              const estiloTiempo = getEstiloTiempo(pub.horasRestantes || 72);
+              const horas = calcularHorasRestantes(pub.creado_en);
+              const estiloTiempo = getEstiloTiempo(horas);
               
-              const ids = Array.isArray(pub.estaciones) ? pub.estaciones : [pub.id_estacion];
+              const ids = Array.isArray(pub.estaciones) ? pub.estaciones : [pub.estacionId];
               const estacionesNombres = ids
                 .map(id => TODAS_LAS_ESTACIONES.find(e => Number(e.id) === Number(id)))
                 .filter(Boolean);
@@ -417,7 +460,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                         ${Number(pub.precio).toLocaleString('es-CL')}
                       </div>
 
-                      {/* Chips estaciones con multilínea */}
+                      {/* Chips estaciones */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                         {estacionesNombres.map(est => (
                           <span key={est.id} style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -443,7 +486,7 @@ export default function MisPublicaciones({ publicaciones, onCrearPublicacion, on
                       borderRadius: '6px',
                       fontWeight: 'bold'
                     }}>
-                      ⏳ {pub.horasRestantes || 72}h
+                      ⏳ {horas}h
                     </span>
 
                     <button
